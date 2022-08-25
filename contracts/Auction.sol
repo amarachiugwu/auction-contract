@@ -10,7 +10,7 @@ interface IERC721 {
 } 
 
 contract Auction {
-    // ERC721 Interface
+    // IERC721 Interface
     // start auction by the seller
     // bid function
     // store failded bids
@@ -27,7 +27,8 @@ contract Auction {
     address public highestBidder;
     bool public started;
     bool public ended;
-    uint32 deadline = uint32(block.timestamp + 90);
+    IERC721 public nft;
+    uint32 deadline = uint32(block.timestamp + 180);
 
     mapping(address => uint) bids;
 
@@ -38,12 +39,14 @@ contract Auction {
 
     constructor (
         uint _nftId,
-        uint _minBid
+        uint _minBid,
+        address _nftAddr
 
     ) {
         seller = payable(msg.sender);
         nftId = _nftId;
         minBid = _minBid;
+        nftAddr = _nftAddr;
     }
 
     function startAuction () external {
@@ -52,7 +55,7 @@ contract Auction {
 
         started = true;
 
-        IERC721 nft = IERC721(nftAddr);
+        nft = IERC721(nftAddr);
         nft.transferFrom(seller, address(this), nftId);
 
         emit Start (msg.sender);
@@ -74,15 +77,20 @@ contract Auction {
     }
 
     function endAuction () external{
-        require(!started, "not started");
+        require(started, "not started");
         require(block.timestamp >= deadline, "time not reached");
         require(!ended, "Auction Ended");
 
         ended = true;
+        
+        nft = IERC721(nftAddr);
+        if(highestBidder != address(0)){
+            nft.transferFrom(address(this), highestBidder, nftId);
+            seller.transfer(highestBid); 
+        }else{
+            nft.transferFrom(address(this), seller, nftId);
+        }
 
-        IERC721 nft = IERC721(nftAddr);
-        nft.transferFrom(address(this), highestBidder, nftId);
-        seller.transfer(highestBid);
 
         emit End (msg.sender, highestBidder, highestBid);
     }
